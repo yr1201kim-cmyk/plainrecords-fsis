@@ -14,9 +14,10 @@ jobs:
         env:
           FSIS_KEY: ${{ secrets.FSIS_KEY }}
         run: |
-          curl -sS -f -m 120 -o recalls.json.part -H "x-pr-key: $FSIS_KEY" \
+          curl -sS -m 120 -o recalls.json.part -w "worker answered %{http_code}\n" -H "x-pr-key: $FSIS_KEY" \
             -A "Mozilla/5.0 (compatible; PlainRecords/1.0; +https://plainrecords.com; host@plainrecords.com)" \
             "https://fsis-fetch.plainrecords.workers.dev/?u=https%3A%2F%2Fwww.fsis.usda.gov%2Ffsis%2Fapi%2Frecall%2Fv%2F1"
+          head -c 300 recalls.json.part | tr -d '\n'; echo
           python3 -c "import json; d=json.load(open('recalls.json.part')); assert isinstance(d, list) and len(d) > 100, len(d); print(len(d), 'recalls')"
           mv recalls.json.part recalls.json
           date -u +%FT%TZ > fetched.txt
