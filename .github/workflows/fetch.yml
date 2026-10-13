@@ -1,0 +1,27 @@
+name: fetch FSIS recalls
+on:
+  schedule:
+    - cron: "40 0 * * *"   # 00:40 UTC, before plainrecords.com's 01:30 build
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch the recall API
+        run: |
+          curl -sS -f -m 120 -o recalls.json.part \
+            -H "User-Agent: Mozilla/5.0 (compatible; PlainRecords/1.0; +https://plainrecords.com; host@plainrecords.com)" \
+            -H "Accept: application/json" "https://www.fsis.usda.gov/fsis/api/recall/v/1"
+          python3 -c "import json; d=json.load(open('recalls.json.part')); assert isinstance(d, list) and len(d) > 100, len(d); print(len(d), 'recalls')"
+          mv recalls.json.part recalls.json
+          date -u +%FT%TZ > fetched.txt
+      - name: keep one commit
+        run: |
+          git config user.name "plainrecords-bot"
+          git config user.email "host@plainrecords.com"
+          git add recalls.json fetched.txt
+          git commit -q -m "FSIS recalls $(cat fetched.txt)" || exit 0
+          git push -q
